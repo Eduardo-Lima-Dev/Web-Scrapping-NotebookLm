@@ -1,12 +1,43 @@
+import { normalizeStringsDeep } from './math-normalizer.js';
+
 /**
  * Lê o DOM da página do NotebookLM e devolve um snapshot heurístico do estado do quiz.
  * Ajuste os seletores aqui se o layout do NotebookLM mudar.
  */
 
 export async function extractQuizSnapshot(page) {
-  return page.evaluate(() => {
+  const snap = await page.evaluate(() => {
+    const subscriptDigits = {
+      '0': '₀',
+      '1': '₁',
+      '2': '₂',
+      '3': '₃',
+      '4': '₄',
+      '5': '₅',
+      '6': '₆',
+      '7': '₇',
+      '8': '₈',
+      '9': '₉',
+    };
+
+    function formatChemicalLikeTokens(input) {
+      let out = input;
+      // Ex.: "CO 2" -> "CO2"
+      out = out.replace(/\b([A-Z]{1,5})\s+(\d{1,3})\b/g, '$1$2');
+      // Ex.: "CO2" -> "CO₂", "CH4" -> "CH₄"
+      out = out.replace(/\b([A-Z][A-Za-z0-9]{1,12})\b/g, (token) => {
+        if (!/[A-Z]/.test(token) || !/\d/.test(token)) return token;
+        return token.replace(/\d/g, (d) => subscriptDigits[d] || d);
+      });
+      return out;
+    }
+
     function normalize(s) {
-      return (s || '').replace(/\s+/g, ' ').trim();
+      const raw = (s || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '') // remove zero-width chars
+        .replace(/\s+/g, ' ')
+        .trim();
+      return formatChemicalLikeTokens(raw);
     }
 
     function questionHash(str) {
@@ -299,4 +330,5 @@ export async function extractQuizSnapshot(page) {
       rawHints,
     };
   });
+  return normalizeStringsDeep(snap);
 }
