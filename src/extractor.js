@@ -161,7 +161,7 @@ export async function extractQuizSnapshot(page) {
         optionEls.some((el) => /\bcorrect\b|\bincorrect\b/.test(String(el.className || '')));
     }
 
-    /** @type {{ label: string, text: string, selectedByUser: boolean, isCorrect: boolean | null }[]} */
+    /** @type {{ label: string, text: string, selectedByUser: boolean, isCorrect: boolean }[]} */
     const alternatives = [];
 
     let userAnswer = null;
@@ -183,7 +183,7 @@ export async function extractQuizSnapshot(page) {
       // Fallback antigo: algumas variantes marcam a escolhida como incorrect.
       if (!selectedByUser && /\bincorrect\b/i.test(cls)) selectedByUser = true;
 
-      let isCorrect = null;
+      let isCorrect = false;
       if (feedbackVisible) {
         if (looksCorrect(el)) isCorrect = true;
         else if (looksIncorrectMarked(el) || selectedByUser) {
