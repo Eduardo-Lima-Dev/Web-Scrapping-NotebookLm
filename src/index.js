@@ -71,6 +71,51 @@ async function waitEnter(message) {
   });
 }
 
+async function askLevel() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const map = {
+    '1': 'facil',
+    '2': 'medio',
+    '3': 'dificil',
+    facil: 'facil',
+    medio: 'medio',
+    difícil: 'dificil',
+    dificil: 'dificil',
+  };
+
+  const prompt =
+    '\nSelecione o nível do quiz:\n' +
+    '  1) facil\n' +
+    '  2) medio\n' +
+    '  3) dificil\n' +
+    'Digite o número ou nome do nível: ';
+
+  const level = await new Promise((resolve) => {
+    const ask = () => {
+      rl.question(prompt, (answer) => {
+        const normalized = String(answer || '')
+          .trim()
+          .toLowerCase();
+        const parsed = map[normalized];
+        if (!parsed) {
+          console.log('[aviso] Opção inválida. Tente novamente.');
+          ask();
+          return;
+        }
+        resolve(parsed);
+      });
+    };
+    ask();
+  });
+
+  rl.close();
+  return level;
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
@@ -139,6 +184,11 @@ async function main() {
   await waitEnter(
     '\n>>> Pressione ENTER quando o quiz estiver visível e você estiver pronto para começar a responder.\n'
   );
+
+  const level = await askLevel();
+  storage.setLevel(level);
+  await storage.flush();
+  console.log(`[info] Nível selecionado: ${level}`);
 
   console.log('[info] Captura iniciada. Responda as questões no Chrome; Ctrl+C encerra e salva.\n');
 

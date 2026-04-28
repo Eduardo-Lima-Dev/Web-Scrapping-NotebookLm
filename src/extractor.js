@@ -71,7 +71,15 @@ export async function extractQuizSnapshot(page) {
       return normalize(root.innerText).slice(0, 1500) || null;
     }
 
-    function extractOptionLabel(text, index) {
+    function extractOptionLabelFromElement(el, text, index) {
+      const prefixEl = el.querySelector('.answer-prefix');
+      if (prefixEl) {
+        const p = normalize(prefixEl.innerText).replace(/[\s.)\-:]/g, '');
+        if (p) return p.toUpperCase();
+      }
+      const aria = normalize(el.getAttribute('aria-label') || '');
+      const ariaMatch = aria.match(/^([A-Da-d]|\d+)\s*[.):\-]/);
+      if (ariaMatch) return String(ariaMatch[1]).toUpperCase();
       const m = normalize(text).match(/^[\s]*([A-Da-d]|\d+)[\s.):\-]/);
       if (m) return String(m[1]).toUpperCase();
       return String.fromCharCode(65 + index);
@@ -162,13 +170,18 @@ export async function extractQuizSnapshot(page) {
     optionEls.forEach((el, index) => {
       const textEl = el.querySelector('.answer-text');
       const text = normalize(textEl?.innerText || el.innerText || el.textContent || '');
-      const label = extractOptionLabel(text, index);
+      const label = extractOptionLabelFromElement(el, text, index);
 
       let selectedByUser = false;
       if (el.getAttribute('aria-checked') === 'true') selectedByUser = true;
       if (el.getAttribute('aria-pressed') === 'true') selectedByUser = true;
       if (el.matches?.('input:checked')) selectedByUser = true;
-      if (/selected|active|chosen|incorrect/i.test(el.className || '')) selectedByUser = true;
+      const cls = String(el.className || '');
+      if (/selected|active|chosen/i.test(cls)) selectedByUser = true;
+      // No layout atual do NotebookLM, a opção clicada costuma carregar "reaction-*".
+      if (/\breaction-(correct|incorrect)\b/i.test(el.innerHTML || '')) selectedByUser = true;
+      // Fallback antigo: algumas variantes marcam a escolhida como incorrect.
+      if (!selectedByUser && /\bincorrect\b/i.test(cls)) selectedByUser = true;
 
       let isCorrect = null;
       if (feedbackVisible) {
@@ -240,7 +253,9 @@ export async function extractQuizSnapshot(page) {
       if (userAnswer && correctAnswer) {
         result = userAnswer === correctAnswer ? 'correct' : 'incorrect';
       }
-      if (!result) result = 'unknown';
+      if (!result) {
+        result = userAnswer == null ? 'not_answered' : 'unknown';
+      }
     }
 
     let hasNextButton = false;

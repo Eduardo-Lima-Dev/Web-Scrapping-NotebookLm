@@ -137,6 +137,15 @@ export function validateQuizData(data) {
         message: 'result=unknown apesar de userAnswer e correctAnswer estarem preenchidos.',
       });
     }
+
+    if (result === 'not_answered' && userAnswer) {
+      issues.push({
+        severity: 'warning',
+        code: 'result_not_answered_with_user',
+        questionIndex: idx,
+        message: 'result=not_answered apesar de userAnswer estar preenchido.',
+      });
+    }
   }
 
   return summarize(issues);

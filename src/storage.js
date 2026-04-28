@@ -20,6 +20,7 @@ export function createStorage(outputDir = defaultOutputDir()) {
     source: 'notebooklm',
     url: '',
     totalQuestions: 0,
+    level: null,
     questions: [],
   };
 
@@ -42,5 +43,10 @@ export function createStorage(outputDir = defaultOutputDir()) {
     if (url && !data.url) data.url = url;
   }
 
-  return { filePath, data, addQuestion, flush, setUrl };
+  /** @param {'facil' | 'medio' | 'dificil'} level */
+  function setLevel(level) {
+    data.level = level;
+  }
+
+  return { filePath, data, addQuestion, flush, setUrl, setLevel };
 }
