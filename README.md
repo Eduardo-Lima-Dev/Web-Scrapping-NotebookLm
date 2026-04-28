@@ -50,6 +50,17 @@ Ou:
 node src/index.js
 ```
 
+## Prompt recomendado (NotebookLM)
+
+Use este prompt para gerar os quizzes antes de executar o scraper:
+
+```text
+Tema: [TEMA]
+Quantidade: [QUANTIDADE]
+
+Gere um quiz com essas configurações, com 5 alternativas por questão (A-E), 1 correta, justificativa de todas as alternativas e gabarito resumido no final.
+```
+
 Quando aparecer o prompt, pressione **ENTER** para começar a registrar. **Responda cada questão no Chrome**; quando o feedback (correto/incorreta + explicação) aparecer, o script atualiza o cache e **salva a questão ao mudar para a próxima** ou ao detectar a tela de fim.
 
 O arquivo é gravado em `output/quiz-<timestamp>.json` de forma **incremental** após cada questão capturada.
