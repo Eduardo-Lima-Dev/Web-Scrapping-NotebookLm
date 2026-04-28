@@ -16,6 +16,7 @@ function parseArgs(argv) {
     outputDir: process.env.OUTPUT_DIR || defaultOutputDir(),
     maxMinutes: Number(process.env.MAX_MINUTES || '120') || 120,
     pollMs: Number(process.env.POLL_MS || '500') || 500,
+    autoPlay: String(process.env.AUTO_PLAY || '').trim() === '1',
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -27,6 +28,8 @@ function parseArgs(argv) {
       out.maxMinutes = Number(argv[++i]) || 120;
     } else if (a === '--poll-ms' && argv[i + 1]) {
       out.pollMs = Number(argv[++i]) || 500;
+    } else if (a === '--auto') {
+      out.autoPlay = true;
     } else if (a === '--help' || a === '-h') {
       out.help = true;
     }
@@ -49,6 +52,7 @@ Opções:
   --output <dir>     Pasta de saída
   --max-minutes <n>  Tempo máximo em minutos
   --poll-ms <n>      Intervalo de polling
+  --auto             Clica automaticamente em alternativa, Próxima e Concluir
   -h, --help         Esta ajuda
 
 Antes: inicie o Chrome com --remote-debugging-port=9222, abra o NotebookLM,
@@ -141,6 +145,55 @@ async function askLevel() {
   return level;
 }
 
+async function askSubject() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const options = [
+    'ciencias',
+    'matematica',
+    'portugues',
+    'historia',
+    'geografia',
+    'biologia',
+    'fisica',
+    'quimica',
+    'ingles',
+  ];
+  const map = Object.fromEntries(options.map((opt, i) => [String(i + 1), opt]));
+  for (const opt of options) map[opt] = opt;
+
+  const prompt =
+    '\nSelecione a matéria do quiz:\n' +
+    options.map((opt, i) => `  ${i + 1}) ${opt}`).join('\n') +
+    '\nDigite o número ou nome da matéria: ';
+
+  const subject = await new Promise((resolve) => {
+    const ask = () => {
+      rl.question(prompt, (answer) => {
+        const normalized = String(answer || '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        const parsed = map[normalized];
+        if (!parsed) {
+          console.log('[aviso] Matéria inválida. Tente novamente.');
+          ask();
+          return;
+        }
+        resolve(parsed);
+      });
+    };
+    ask();
+  });
+
+  rl.close();
+  return subject;
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
@@ -214,17 +267,30 @@ async function main() {
   storage.setQuizName(quizName);
   console.log(`[info] Arquivo de saída definido: ${storage.filePath}`);
 
+  const subject = await askSubject();
+  storage.setSubject(subject);
+  console.log(`[info] Matéria selecionada: ${subject}`);
+
   const level = await askLevel();
   storage.setLevel(level);
   await storage.flush();
   console.log(`[info] Nível selecionado: ${level}`);
 
-  console.log('[info] Captura iniciada. Responda as questões no Chrome; Ctrl+C encerra e salva.\n');
+  if (args.autoPlay) {
+    console.log(
+      '[info] Captura iniciada em modo AUTO. O script irá clicar em alternativas e avançar automaticamente.\n'
+    );
+  } else {
+    console.log(
+      '[info] Captura iniciada. Responda as questões no Chrome; Ctrl+C encerra e salva.\n'
+    );
+  }
 
   try {
     await runCaptureLoop(page, storage, {
       pollMs: args.pollMs,
       maxMinutes: args.maxMinutes,
+      autoPlay: args.autoPlay,
     });
   } finally {
     await storage.flush();

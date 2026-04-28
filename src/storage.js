@@ -20,6 +20,7 @@ export function createStorage(outputDir = defaultOutputDir()) {
     source: 'notebooklm',
     url: '',
     totalQuestions: 0,
+    subject: null,
     level: null,
     questions: [],
   };
@@ -48,6 +49,11 @@ export function createStorage(outputDir = defaultOutputDir()) {
     data.level = level;
   }
 
+  /** @param {string} subject */
+  function setSubject(subject) {
+    data.subject = subject;
+  }
+
   /** @param {string} quizName */
   function setQuizName(quizName) {
     const normalized = String(quizName || '')
@@ -71,6 +77,7 @@ export function createStorage(outputDir = defaultOutputDir()) {
     addQuestion,
     flush,
     setUrl,
+    setSubject,
     setLevel,
     setQuizName,
   };

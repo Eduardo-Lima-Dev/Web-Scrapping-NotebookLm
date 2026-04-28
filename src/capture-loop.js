@@ -12,6 +12,8 @@ import { extractQuizSnapshot } from './extractor.js';
 export async function runCaptureLoop(page, storage, options = {}) {
   const pollMs = options.pollMs ?? 500;
   const maxMinutes = options.maxMinutes ?? 120;
+  const autoPlay = options.autoPlay ?? false;
+  const autoCooldownMs = options.autoCooldownMs ?? 700;
 
   const savedHashes = new Set();
   /** Último snapshot em que já apareceu feedback (por hash da questão). */
@@ -22,6 +24,8 @@ export async function runCaptureLoop(page, storage, options = {}) {
   let lastQuestionHash = null;
   let lastUrl = '';
   let noQuizTicks = 0;
+  let lastAutoActionAt = 0;
+  let everDetectedQuiz = false;
 
   const started = Date.now();
   const maxMs = maxMinutes * 60 * 1000;
@@ -41,11 +45,12 @@ export async function runCaptureLoop(page, storage, options = {}) {
   while (Date.now() - started < maxMs) {
     await delay(pollMs);
 
-    const snap = await extractBestSnapshot(page).catch((err) => {
+    const best = await extractBestSnapshot(page).catch((err) => {
       console.warn('[aviso] falha ao ler página:', err.message);
       return null;
     });
-    if (!snap) continue;
+    if (!best) continue;
+    const { snap, frame } = best;
 
     if (snap.url && snap.url !== lastUrl) {
       storage.setUrl(snap.url);
@@ -60,7 +65,15 @@ export async function runCaptureLoop(page, storage, options = {}) {
         );
       }
     } else {
+      everDetectedQuiz = true;
       noQuizTicks = 0;
+    }
+
+    // Em modo AUTO, se o quiz já foi detectado e depois desapareceu por alguns ciclos,
+    // assumimos fim do fluxo (ex.: clique em "Concluir" levou para tela/estado final).
+    if (autoPlay && everDetectedQuiz && !snap.quizDetected && noQuizTicks >= 6) {
+      console.log('[fim] Quiz não detectado após etapa final no modo AUTO. Encerrando captura.');
+      break;
     }
 
     if (snap.feedbackVisible && snap.questionHash && snap.questionText) {
@@ -89,6 +102,30 @@ export async function runCaptureLoop(page, storage, options = {}) {
 
     if (currentHash !== null) {
       lastQuestionHash = currentHash;
+    }
+
+    if (autoPlay && snap.quizDetected) {
+      const action = await autoPlayStep(frame, snap, {
+        cooldownMs: autoCooldownMs,
+        getLastActionAt: () => lastAutoActionAt,
+        setLastActionAt: (t) => {
+          lastAutoActionAt = t;
+        },
+      });
+      if (action === 'finish') {
+        if (lastQuestionHash && !savedHashes.has(lastQuestionHash)) {
+          const last = feedbackCache.get(lastQuestionHash);
+          if (last?.feedbackVisible) {
+            await persistSnapshot(last);
+            savedHashes.add(lastQuestionHash);
+          }
+        }
+        console.log('[fim] Concluir/Finalizar detectado no modo AUTO.');
+        break;
+      }
+      if (action) {
+        await delay(Math.min(350, pollMs));
+      }
     }
 
     // Salva imediatamente quando feedback da questão atual já está visível e estável.
@@ -143,29 +180,32 @@ function delay(ms) {
 
 async function extractBestSnapshot(page) {
   const frames = page.frames();
-  /** @type {Array<any>} */
+  /** @type {Array<{ frame: import('puppeteer-core').Frame, snap: any }>} */
   const snaps = [];
 
   for (const frame of frames) {
     try {
       const s = await extractQuizSnapshot(frame);
-      snaps.push(s);
+      snaps.push({ frame, snap: s });
     } catch {
       // Alguns frames podem falhar por timing/navegação; ignoramos.
     }
   }
 
   if (snaps.length === 0) {
-    return extractQuizSnapshot(page);
+    return {
+      frame: page.mainFrame(),
+      snap: await extractQuizSnapshot(page),
+    };
   }
 
   let best = snaps[0];
-  let bestScore = scoreSnapshot(best);
+  let bestScore = scoreSnapshot(best.snap);
   for (let i = 1; i < snaps.length; i++) {
-    const s = snaps[i];
-    const sc = scoreSnapshot(s);
+    const candidate = snaps[i];
+    const sc = scoreSnapshot(candidate.snap);
     if (sc > bestScore) {
-      best = s;
+      best = candidate;
       bestScore = sc;
     }
   }
@@ -183,4 +223,110 @@ function scoreSnapshot(s) {
   if (/question|quiz|teste|resposta|correta|incorreta/i.test(s.questionText || ''))
     score += 15;
   return score;
+}
+
+/**
+ * @param {import('puppeteer-core').Frame} frame
+ * @param {any} snap
+ * @param {{ cooldownMs: number, getLastActionAt: () => number, setLastActionAt: (t: number) => void }} ctx
+ * @returns {Promise<'option' | 'next' | 'finish' | false>}
+ */
+async function autoPlayStep(frame, snap, ctx) {
+  const now = Date.now();
+  if (now - ctx.getLastActionAt() < ctx.cooldownMs) return false;
+
+  if (!snap.feedbackVisible) {
+    const clickedOption = await clickInFrame(frame, () => {
+      const candidates = Array.from(
+        document.querySelectorAll('.answer-options .answer-btn, .answer-btn')
+      ).filter((el) => {
+        const btn = /** @type {HTMLButtonElement} */ (el);
+        if (btn.disabled) return false;
+        const text = (btn.innerText || '').trim();
+        return text.length > 0;
+      });
+      const target = candidates[0];
+      if (!target) return false;
+      /** @type {HTMLElement} */ (target).click();
+      return true;
+    });
+    if (clickedOption) {
+      console.log('[auto] Alternativa clicada.');
+      ctx.setLastActionAt(now);
+      return 'option';
+    }
+    return false;
+  }
+
+  const clickedNext = await clickInFrame(frame, () => {
+    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+    for (const b of buttons) {
+      const el = /** @type {HTMLElement} */ (b);
+      const txt = (el.innerText || el.getAttribute('aria-label') || '')
+        .trim()
+        .toLowerCase();
+      const cls = String(el.className || '');
+      if (
+        /\bnext-btn\b/.test(cls) ||
+        txt === 'próxima' ||
+        txt === 'próximo' ||
+        txt === 'next' ||
+        txt === 'continuar' ||
+        txt === 'continue'
+      ) {
+        if ('disabled' in el && /** @type {HTMLButtonElement} */ (el).disabled) continue;
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  });
+  if (clickedNext) {
+    console.log('[auto] Botão Próxima/Next clicado.');
+    ctx.setLastActionAt(now);
+    return 'next';
+  }
+
+  const clickedFinish = await clickInFrame(frame, () => {
+    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+    for (const b of buttons) {
+      const el = /** @type {HTMLElement} */ (b);
+      const txt = (el.innerText || el.getAttribute('aria-label') || '')
+        .trim()
+        .toLowerCase();
+      if (
+        txt.includes('concluir') ||
+        txt.includes('finalizar') ||
+        txt.includes('encerrar') ||
+        txt.includes('finish') ||
+        txt.includes('submit')
+      ) {
+        if ('disabled' in el && /** @type {HTMLButtonElement} */ (el).disabled) continue;
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  });
+  if (clickedFinish) {
+    console.log('[auto] Botão Concluir/Finalizar clicado.');
+    ctx.setLastActionAt(now);
+    return 'finish';
+  }
+
+  return false;
+}
+
+/**
+ * @template T
+ * @param {import('puppeteer-core').Frame} frame
+ * @param {() => T} fn
+ * @returns {Promise<T | false>}
+ */
+async function clickInFrame(frame, fn) {
+  try {
+    return await frame.evaluate(fn);
+  } catch {
+    return false;
+  }
 }

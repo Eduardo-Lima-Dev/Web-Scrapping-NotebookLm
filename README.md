@@ -67,7 +67,8 @@ O arquivo é gravado em `output/quiz-<timestamp>.json` de forma **incremental** 
 Após o ENTER, o script solicita:
 
 1. nome do quiz (usado no nome do arquivo `.json`);
-2. nível do quiz (`facil`, `medio` ou `dificil`), salvo no campo `level`.
+2. matéria do quiz (ex.: `matematica`, `portugues`, etc.), salva no campo `subject`;
+3. nível do quiz (`facil`, `medio` ou `dificil`), salvo no campo `level`.
 
 ### Validação automática pós-execução
 
@@ -89,12 +90,21 @@ Se aparecerem avisos/erros, revise o JSON antes de enviar para o NotebookLM.
 | `OUTPUT_DIR` / `--output` | Pasta de saída (padrão: `./output`) |
 | `MAX_MINUTES` / `--max-minutes` | Tempo máximo de execução (padrão: 120) |
 | `POLL_MS` / `--poll-ms` | Intervalo de leitura do DOM em ms (padrão: 500) |
+| `AUTO_PLAY=1` / `--auto` | Modo automático: clica alternativa, Próxima e Concluir |
 
 Exemplo:
 
 ```bash
 OUTPUT_DIR=./meus-quizzes node src/index.js --max-minutes 60
 ```
+
+Exemplo em modo automático:
+
+```bash
+node src/index.js --auto
+```
+
+No modo automático, quando o botão `Concluir/Finalizar` é clicado, o quiz é tratado como encerrado e o JSON é salvo imediatamente na finalização do processo.
 
 ### Encerrar com Ctrl+C
 
@@ -106,7 +116,7 @@ O NotebookLM pode mudar o HTML. Edite [`src/extractor.js`](src/extractor.js) par
 
 ## Formato do JSON
 
-Ver estrutura em `output/quiz-*.json`: `capturedAt`, `url`, `totalQuestions`, `level`, `questions[]` com `question` e `alternatives` (cada alternativa com `label`, `text`, `explanation`, `selectedByUser`, `isCorrect`).
+Ver estrutura em `output/quiz-*.json`: `capturedAt`, `url`, `totalQuestions`, `subject`, `level`, `questions[]` com `question` e `alternatives` (cada alternativa com `label`, `text`, `explanation`, `selectedByUser`, `isCorrect`).
 
 ## Licença
 
