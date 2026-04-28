@@ -161,7 +161,7 @@ export async function extractQuizSnapshot(page) {
         optionEls.some((el) => /\bcorrect\b|\bincorrect\b/.test(String(el.className || '')));
     }
 
-    /** @type {{ label: string, text: string, selectedByUser: boolean, isCorrect: boolean }[]} */
+    /** @type {{ label: string, text: string, explanation: string | null, selectedByUser: boolean, isCorrect: boolean }[]} */
     const alternatives = [];
 
     let userAnswer = null;
@@ -170,6 +170,8 @@ export async function extractQuizSnapshot(page) {
     optionEls.forEach((el, index) => {
       const textEl = el.querySelector('.answer-text');
       const text = normalize(textEl?.innerText || el.innerText || el.textContent || '');
+      const rationaleEl = el.querySelector('.rationale');
+      const altExplanation = rationaleEl ? normalize(rationaleEl.innerText) : null;
       const label = extractOptionLabelFromElement(el, text, index);
 
       let selectedByUser = false;
@@ -200,6 +202,7 @@ export async function extractQuizSnapshot(page) {
       alternatives.push({
         label,
         text: text.slice(0, 2000),
+        explanation: altExplanation ? altExplanation.slice(0, 4000) : null,
         selectedByUser,
         isCorrect,
       });

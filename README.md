@@ -53,7 +53,10 @@ node src/index.js
 Quando aparecer o prompt, pressione **ENTER** para começar a registrar. **Responda cada questão no Chrome**; quando o feedback (correto/incorreta + explicação) aparecer, o script atualiza o cache e **salva a questão ao mudar para a próxima** ou ao detectar a tela de fim.
 
 O arquivo é gravado em `output/quiz-<timestamp>.json` de forma **incremental** após cada questão capturada.
-Após o ENTER, o script solicita o nível do quiz (`facil`, `medio` ou `dificil`) e grava esse valor no campo `level` do JSON.
+Após o ENTER, o script solicita:
+
+1. nome do quiz (usado no nome do arquivo `.json`);
+2. nível do quiz (`facil`, `medio` ou `dificil`), salvo no campo `level`.
 
 ### Validação automática pós-execução
 
@@ -92,14 +95,7 @@ O NotebookLM pode mudar o HTML. Edite [`src/extractor.js`](src/extractor.js) par
 
 ## Formato do JSON
 
-Ver estrutura em `output/quiz-*.json`: `capturedAt`, `url`, `totalQuestions`, `level`, `questions[]` com `question`, `alternatives`, `userAnswer`, `correctAnswer`, `result`, `explanation`.
-
-Valores de `result`:
-
-- `correct`: resposta do usuário bate com a correta
-- `incorrect`: resposta do usuário difere da correta
-- `not_answered`: feedback/correta detectados, mas sem resposta do usuário detectada
-- `unknown`: estado ambíguo/insuficiente para classificar com segurança
+Ver estrutura em `output/quiz-*.json`: `capturedAt`, `url`, `totalQuestions`, `level`, `questions[]` com `question` e `alternatives` (cada alternativa com `label`, `text`, `explanation`, `selectedByUser`, `isCorrect`).
 
 ## Licença
 

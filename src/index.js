@@ -71,6 +71,31 @@ async function waitEnter(message) {
   });
 }
 
+async function askQuizName() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const name = await new Promise((resolve) => {
+    const ask = () => {
+      rl.question('\nDigite o nome do quiz (será usado no nome do arquivo JSON): ', (answer) => {
+        const normalized = String(answer || '').trim();
+        if (!normalized) {
+          console.log('[aviso] Nome inválido. Tente novamente.');
+          ask();
+          return;
+        }
+        resolve(normalized);
+      });
+    };
+    ask();
+  });
+
+  rl.close();
+  return name;
+}
+
 async function askLevel() {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -184,6 +209,10 @@ async function main() {
   await waitEnter(
     '\n>>> Pressione ENTER quando o quiz estiver visível e você estiver pronto para começar a responder.\n'
   );
+
+  const quizName = await askQuizName();
+  storage.setQuizName(quizName);
+  console.log(`[info] Arquivo de saída definido: ${storage.filePath}`);
 
   const level = await askLevel();
   storage.setLevel(level);

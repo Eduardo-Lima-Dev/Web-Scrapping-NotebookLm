@@ -34,10 +34,6 @@ export async function runCaptureLoop(page, storage, options = {}) {
       index: idx,
       question: snap.questionText,
       alternatives: snap.alternatives,
-      userAnswer: snap.userAnswer,
-      correctAnswer: snap.correctAnswer,
-      result: snap.result,
-      explanation: snap.explanation,
     });
     console.log(`[capturado] questão ${idx}`);
   }

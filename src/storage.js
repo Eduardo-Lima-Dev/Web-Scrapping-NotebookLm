@@ -13,7 +13,7 @@ export function defaultOutputDir() {
  */
 export function createStorage(outputDir = defaultOutputDir()) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filePath = path.join(outputDir, `quiz-${stamp}.json`);
+  let filePath = path.join(outputDir, `quiz-${stamp}.json`);
 
   const data = {
     capturedAt: new Date().toISOString(),
@@ -48,5 +48,30 @@ export function createStorage(outputDir = defaultOutputDir()) {
     data.level = level;
   }
 
-  return { filePath, data, addQuestion, flush, setUrl, setLevel };
+  /** @param {string} quizName */
+  function setQuizName(quizName) {
+    const normalized = String(quizName || '')
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+    const base = normalized || `quiz-${stamp}`;
+    const file = base.endsWith('.json') ? base : `${base}.json`;
+    filePath = path.join(outputDir, file);
+  }
+
+  return {
+    get filePath() {
+      return filePath;
+    },
+    data,
+    addQuestion,
+    flush,
+    setUrl,
+    setLevel,
+    setQuizName,
+  };
 }
