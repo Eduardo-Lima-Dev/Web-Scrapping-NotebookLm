@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { connectToNotebookLM } from './connect.js';
 import { runCaptureLoop } from './capture-loop.js';
 import { createStorage, defaultOutputDir } from './storage.js';
+import { validateQuizData } from './validation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +84,27 @@ async function main() {
   let browser;
   let shuttingDown = false;
 
+  function printValidationReport() {
+    const report = validateQuizData(storage.data);
+    if (report.ok && report.warningCount === 0) {
+      console.log('[validação] OK: nenhuma inconsistência detectada.');
+      return;
+    }
+    console.log(
+      `[validação] ${report.errorCount} erro(s), ${report.warningCount} aviso(s).`
+    );
+    for (const issue of report.issues.slice(0, 20)) {
+      const q = issue.questionIndex ? `Q${issue.questionIndex} ` : '';
+      const tag = issue.severity === 'error' ? 'ERRO' : 'AVISO';
+      console.log(`[validação] ${tag} ${q}${issue.code}: ${issue.message}`);
+    }
+    if (report.issues.length > 20) {
+      console.log(
+        `[validação] ... e mais ${report.issues.length - 20} inconsistência(s).`
+      );
+    }
+  }
+
   const shutdown = async (signal) => {
     if (shuttingDown) return;
     shuttingDown = true;
@@ -90,6 +112,7 @@ async function main() {
     try {
       await storage.flush();
       console.log(`[info] Salvo em: ${storage.filePath}`);
+      printValidationReport();
     } catch (e) {
       console.error('[erro] Falha ao salvar:', e.message);
     }
@@ -126,6 +149,7 @@ async function main() {
     });
   } finally {
     await storage.flush();
+    printValidationReport();
     console.log(`\n[info] Concluído. Total: ${storage.data.totalQuestions} questão(ões).`);
     console.log(`[info] Arquivo: ${storage.filePath}`);
     if (browser && typeof browser.disconnect === 'function') {

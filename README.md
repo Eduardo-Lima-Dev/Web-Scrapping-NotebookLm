@@ -54,6 +54,18 @@ Quando aparecer o prompt, pressione **ENTER** para começar a registrar. **Respo
 
 O arquivo é gravado em `output/quiz-<timestamp>.json` de forma **incremental** após cada questão capturada.
 
+### Validação automática pós-execução
+
+Ao finalizar (normalmente ou com `Ctrl+C`), o script executa validações de consistência no JSON e imprime um relatório no terminal, por exemplo:
+
+- divergência entre `totalQuestions` e `questions.length`
+- labels duplicados em alternativas
+- conflito entre `selectedByUser` e `userAnswer`
+- conflito entre `isCorrect` e `correctAnswer`
+- conflito entre `result` e (`userAnswer`, `correctAnswer`)
+
+Se aparecerem avisos/erros, revise o JSON antes de enviar para o NotebookLM.
+
 ### Opções
 
 | Variável / flag | Descrição |
