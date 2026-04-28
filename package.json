@@ -1,0 +1,17 @@
+{
+  "name": "scraper-notebook",
+  "version": "1.0.0",
+  "description": "Captura quiz do NotebookLM via Chrome com remote debugging",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "capture": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.8.0"
+  }
+}
